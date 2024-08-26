@@ -44,6 +44,7 @@ import (
 	_ "github.com/alist-org/alist/v3/drivers/quark_uc"
 	_ "github.com/alist-org/alist/v3/drivers/quark_uc_tv"
 	_ "github.com/alist-org/alist/v3/drivers/quqi"
+	_ "github.com/alist-org/alist/v3/drivers/rec"
 	_ "github.com/alist-org/alist/v3/drivers/s3"
 	_ "github.com/alist-org/alist/v3/drivers/seafile"
 	_ "github.com/alist-org/alist/v3/drivers/sftp"
