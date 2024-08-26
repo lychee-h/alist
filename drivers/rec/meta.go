@@ -33,7 +33,7 @@ var config = driver.Config{
 	// NoOverwriteUpload: false,
 	Name:        "RecCloud",
 	LocalSort:   true,
-	DefaultRoot: "0",
+	DefaultRoot: "0", // 群盘根目录
 	Alert:       `info|check groupId.`,
 }
 
