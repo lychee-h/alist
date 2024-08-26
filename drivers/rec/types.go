@@ -35,7 +35,8 @@ type Files struct {
 	Type                string `json:"type"`
 	FileExt             string `json:"file_ext"`
 	FileType            string `json:"file_type"`
-	Bytes               int64  `json:"bytes"`
+	BytesInt            int64  `json:"bytes,omitempty"`
+	BytesString         string `json:"bytes,omitempty"`
 	Hash                string `json:"hash"`
 	TranscodeStatus     string `json:"transcode_status"`
 	IsStar              bool   `json:"is_star"`

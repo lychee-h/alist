@@ -1,6 +1,7 @@
 package _rec
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/alist-org/alist/v3/internal/model"
 	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/go-resty/resty/v2"
+	log "github.com/sirupsen/logrus"
 )
 
 type RecCloud struct {
@@ -35,14 +37,16 @@ func (d *RecCloud) Init(ctx context.Context) error {
 		"password":    d.Password,
 		"resultInput": d.ResultInput,
 	}
-	res, err := d.client.R().SetBody(body).Post("http://127.0.0.1/token")
+	d.client = base.NewRestyClient()
+	res, err := d.client.R().SetBody(body).Post("http://127.0.0.1:5000/token")
 	if err != nil {
 		return err
 	}
+	log.Debugln("resp from py:", string(res.Body()))
 	respFromPy := RespFromPy{}
 	json.Unmarshal(res.Body(), &respFromPy)
-	d.client = base.NewRestyClient().
-		SetHeader("x-auth-token", respFromPy.Token)
+	d.client.SetHeader("x-auth-token", respFromPy.Token)
+	log.Debugln("x-auth-token:", respFromPy.Token)
 	return nil
 }
 
@@ -53,17 +57,36 @@ func (d *RecCloud) Drop(ctx context.Context) error {
 func (d *RecCloud) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([]model.Obj, error) {
 	// TODO return the files list, required
 	res := make([]model.Obj, 0)
-	var listResp ListResponse
+	log.Debugln("dirID:", dir.GetID())
+	listResp := ListResponse{}
 	resp, err := d.client.R().SetQueryParam("disk_type", "cloud").
 		SetQueryParam("is_rec", "false").
 		SetQueryParam("category", "all").
 		SetQueryParam("group_number", d.GroupNumber).
 		Get("https://recapi.ustc.edu.cn/api/v2/folder/content/" + dir.GetID())
+	log.Debugln("List rawresponce:", string(resp.Body()))
 	if err != nil {
 		return nil, errs.NotSupport
 	}
-	err = json.Unmarshal(resp.Body(), &listResp)
+	if resp.StatusCode() != 200 {
+		log.Debugln("Unexpected status code:", resp.StatusCode())
+		return nil, errs.NotSupport
+	}
+	// 去除bom头
+	body := resp.Body()
+	if bytes.HasPrefix(body, []byte("\xef\xbb\xbf")) {
+		body = body[3:]
+	}
+	err = json.Unmarshal(body, &listResp)
 	if err != nil {
+		log.Debugf("Unmarshal failed! Error: %v", err)
+
+		var genericMap map[string]interface{}
+		if jsonErr := json.Unmarshal(body, &genericMap); jsonErr == nil {
+			log.Debugf("Unmarshaled into generic map: %+v", genericMap)
+		} else {
+			log.Debugf("Failed to unmarshal into generic map: %v", jsonErr)
+		}
 		return nil, errs.NotSupport
 	}
 	for _, file := range listResp.Entity.Datas {
@@ -78,12 +101,16 @@ func (d *RecCloud) List(ctx context.Context, dir model.Obj, args model.ListArgs)
 
 		} else if file.Type == "file" {
 			lastOpTime := utils.MustParseCNTime(file.LastUpdateDate)
+			// fileBytes, err := strconv.ParseInt(file.Bytes, 10, 64)
+			// if err != nil {
+			// 	return nil, errs.NotSupport
+			// }
 			res = append(res, &model.ObjThumb{
 				Object: model.Object{
 					ID:       file.Number,
-					Name:     file.Name,
+					Name:     file.Name + "." + file.FileExt,
 					Modified: lastOpTime,
-					Size:     file.Bytes,
+					Size:     file.BytesInt,
 				},
 				Thumbnail: model.Thumbnail{},
 			})
@@ -104,7 +131,12 @@ func (d *RecCloud) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 	}
 
 	var downloadResp downloadResponse
-	err = json.Unmarshal(resp.Body(), &downloadResp)
+	// 去除bom头
+	body := resp.Body()
+	if bytes.HasPrefix(body, []byte("\xef\xbb\xbf")) {
+		body = body[3:]
+	}
+	err = json.Unmarshal(body, &downloadResp)
 	if err != nil {
 		return nil, errs.NotSupport
 	}
