@@ -38,7 +38,8 @@ func (d *RecCloud) Init(ctx context.Context) error {
 		"resultInput": d.ResultInput,
 	}
 	d.client = base.NewRestyClient()
-	res, err := d.client.R().SetBody(body).Post("http://127.0.0.1:5000/token")
+	// docker部署改为容器名
+	res, err := d.client.R().SetBody(body).Post("http://ustcautologin:5000/token")
 	if err != nil {
 		return err
 	}
